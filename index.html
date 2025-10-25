@@ -1,0 +1,600 @@
+<!DOCTYPE html>
+<html lang="de">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Palmöl: Die Wahrheit</title> 
+    <script src="https://cdn.tailwindcss.com"></script>
+    <style>
+        /* Zusätzliche globale Styles für bessere Usability */
+        .btn-option {
+            transition: all 0.2s;
+            transform: scale(1);
+        }
+        .btn-option:hover:not(:disabled) {
+            transform: scale(1.02);
+            box-shadow: 0 4px 15px rgba(0, 0, 0, 0.1);
+        }
+        .correct {
+            background-color: #10B981 !important; /* Tailwind green-500 */
+            color: white !important;
+            border-color: #059669 !important; /* Tailwind green-600 */
+        }
+        .incorrect {
+            background-color: #EF4444 !important; /* Tailwind red-500 */
+            color: white !important;
+            border-color: #DC2626 !important; /* Tailwind red-600 */
+        }
+        /* Style für den Timer */
+        #timer-display {
+            font-variant-numeric: tabular-nums;
+        }
+        /* Responsives Layout */
+        @media (min-width: 768px) {
+            .main-content {
+                display: flex;
+                flex-direction: row;
+                gap: 1.5rem;
+                align-items: flex-start; /* Elemente oben ausrichten */
+            }
+            .quiz-area {
+                flex-grow: 1;
+            }
+            .leaderboard-area {
+                width: 20rem; /* Feste Breite für die Bestenliste auf Desktop */
+                min-width: 20rem;
+            }
+        }
+    </style>
+</head>
+<body class="flex flex-col items-center justify-center min-h-screen p-4 bg-gray-100">
+
+    <div class="w-full max-w-6xl flex flex-col gap-6 main-content">
+                <div class="quiz-area w-full">
+            <div id="stats-container" class="bg-white p-4 rounded-xl shadow-lg flex justify-between items-center hidden">
+            <div class="flex items-center space-x-2">
+                <span class="text-gray-600 font-semibold">Frage:</span>
+                <span id="question-counter" class="text-lg font-bold text-indigo-600">0/10</span>
+            </div>
+            <div class="flex items-center space-x-2">
+                <svg class="w-6 h-6 text-yellow-500" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z"></path></svg>
+                <span class="text-gray-600 font-semibold">Zeit:</span>
+                <span id="timer-display" class="text-xl font-extrabold text-red-600">00:00</span>
+            </div>
+            <div class="flex items-center space-x-2">
+                <span class="text-gray-600 font-semibold">Score:</span>
+                <span id="score-display" class="text-lg font-bold text-green-600">0</span>
+            </div>
+        </div>
+        
+                <div id="quiz-container" class="bg-white p-8 rounded-xl shadow-2xl w-full">
+
+                        <div id="start-screen" class="text-center">
+                <h1 id="quiz-title-display" class="text-4xl font-extrabold text-gray-800 mb-4">Palmöl: Die Wahrheit</h1>
+                <p id="quiz-description-display" class="text-gray-600 mb-8">Beantworte die Fragen und knacke den Highscore</p>
+                <div class="p-4 bg-yellow-100 border-l-4 border-yellow-500 text-yellow-700 mb-8" role="alert">
+                    <p class="font-bold">Hinweis:</p>
+                    <p>Um deinen Highscore zu speichern, meldet sich das Quiz automatisch anonym bei Firebase an. Ihr Benutzername wird **öffentlich** geteilt.</p>
+                </div>
+                <button id="start-button" class="bg-indigo-600 hover:bg-indigo-700 text-white font-bold py-3 px-8 rounded-lg shadow-md transition duration-300 transform hover:scale-105" disabled>
+                    Starte das Quiz (Warte auf Anmeldung...)
+                </button>
+            </div>
+
+                        <div id="question-screen" class="hidden">
+                <h2 id="question-text" class="text-2xl font-semibold text-gray-800 mb-6">Frage wird geladen...</h2>
+                <div id="options-container" class="flex flex-col space-y-4 mb-6">
+                                    </div>
+                <div id="feedback-container" class="p-4 bg-gray-100 rounded-lg hidden">
+                    <p id="feedback-text" class="font-medium text-gray-700"></p>
+                    <p id="rationale-text" class="text-sm text-gray-500 mt-2"></p>
+                </div>
+                <button id="next-button" class="mt-6 bg-indigo-500 hover:bg-indigo-600 text-white font-bold py-2 px-6 rounded-lg float-right transition duration-300 hidden" disabled>
+                    Nächste Frage &rarr;
+                </button>
+            </div>
+
+                        <div id="result-screen" class="text-center hidden">
+                <h2 class="text-3xl font-bold text-green-600 mb-4">Quiz beendet!</h2>
+                <p class="text-xl text-gray-700 mb-6">Dein Endergebnis:</p>
+                <div class="bg-indigo-50 p-6 rounded-lg inline-block shadow-inner">
+                    <p class="text-2xl font-extrabold text-indigo-600">Score: <span id="final-score">0</span> / 10</p>
+                    <p class="text-xl font-extrabold text-indigo-600 mt-2">Zeit: <span id="final-time">00:00</span></p>
+                </div>
+
+                <div id="leaderboard-submission" class="mt-8">
+                    <p class="text-gray-700 mb-3">Speichere dein Ergebnis im Highscore!</p>
+                    <input type="text" id="username-input" placeholder="Dein Name" class="p-2 border border-gray-300 rounded-lg w-full max-w-xs text-center mb-3">
+                    <button id="submit-score-button" class="bg-green-600 hover:bg-green-700 text-white font-bold py-2 px-6 rounded-lg transition duration-300">
+                        Score speichern
+                    </button>
+                </div>
+                
+                <button id="restart-button" class="mt-8 bg-gray-500 hover:bg-gray-600 text-white font-bold py-2 px-6 rounded-lg transition duration-300">
+                    Neues Quiz starten
+                </button>
+            </div>
+        </div>
+
+                <div class="bg-white p-6 rounded-xl shadow-lg w-full leaderboard-area">
+            <h3 class="text-2xl font-bold text-gray-800 mb-4 border-b pb-2">Top 10 Highscores</h3>
+            <ul id="leaderboard-list" class="space-y-2">
+                <li class="text-gray-500 italic">Wird geladen...</li>
+            </ul>
+        </div>
+
+    </div>
+
+    <script type="module">
+        // Importiert Firebase SDKs
+        import { initializeApp } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-app.js";
+        import { getAuth, signInAnonymously, signInWithCustomToken, onAuthStateChanged } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-auth.js";
+        import { getFirestore, doc, setDoc, collection, query, orderBy, limit, onSnapshot, serverTimestamp } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js";
+
+        // === QUIZ DYNAMISCHE DATEN ===
+        // 1. Die eindeutige ID des Quizzes, wichtig für die Bestenliste-Trennung.
+        const appId = 'palmoel_quiz_1'; 
+        
+        // 2. Die Firebase-Konfiguration (JETZT MIT IHREN DATEN)
+        const firebaseConfig = {
+            apiKey: "AIzaSyDY9Va_wf2Kj4LREi2jd9_g9H4bts1tygc",
+            authDomain: "quizgenerator-ff451.firebaseapp.com",
+            projectId: "quizgenerator-ff451",
+            storageBucket: "quizgenerator-ff451.firebasestorage.app",
+            messagingSenderId: "396720876641",
+            appId: "1:396720876641:web:700fa550a6129ad06f4e20"
+        };
+
+        // Überprüft, ob die globalen Variablen verfügbar sind, ansonsten werden die Dummy-Daten verwendet
+        const firebaseConfigOverride = typeof __firebase_config !== 'undefined' ? JSON.parse(__firebase_config) : firebaseConfig;
+        const appIdOverride = typeof __app_id !== 'undefined' ? __app_id : appId;
+        const initialAuthToken = typeof __initial_auth_token !== 'undefined' ? __initial_auth_token : null;
+        
+        // 3. Das eigentliche Quiz-Daten-Array
+        const quizData = [
+            {
+                question: "Was ist die Hauptursache für die Bedrohung der Orang-Utans laut Video?",
+                options: [
+                    { text: "Die Ausbreitung von Krankheiten durch Kontakt mit Menschen.", correct: false },
+                    { text: "Illegale Jagd und Wilderei.", correct: false },
+                    { text: "Die Rodung von Regenwald für Palmölplantagen.", correct: true },
+                    { text: "Übermäßige Trockenheit durch Klimawandel.", correct: false }
+                ],
+                rationale: "Die Umwandlung von uraltem Regenwald in Plantagen zerstört den Lebensraum der Tiere am schnellsten und umfassendsten."
+            },
+            {
+                question: "Wie viel Prozent der globalen Palmölproduktion liefern Indonesien und Malaysia etwa?",
+                options: [
+                    { text: "65 Prozent", correct: false },
+                    { text: "95 Prozent", correct: false },
+                    { text: "50 Prozent", correct: false },
+                    { text: "85 Prozent", correct: true }
+                ],
+                rationale: "Diese beiden Länder sind die primären Produzenten und machen den Großteil des weltweiten Angebots aus."
+            },
+            {
+                question: "Was ist ein Hauptgrund dafür, dass Palmöl in der Lebensmittelindustrie so beliebt ist?",
+                options: [
+                    { text: "Es hat einen besonders hohen Anteil an Omega-3-Fettsäuren.", correct: false },
+                    { text: "Es ist hitzebeständig, geruchsneutral und billig.", correct: true },
+                    { text: "Es ist das einzige Öl, das die Textur von Schokolade perfekt macht.", correct: false },
+                    { text: "Es kann nur in Europa nachhaltig produziert werden.", correct: false }
+                ],
+                rationale: "Die Kombination aus Kosten, Stabilität, und Neutralität macht es industriell für eine breite Palette von Produkten wertvoll."
+            },
+            {
+                question: "Wie hat sich die Zahl der frei lebenden Orang-Utans in den vergangenen anderthalb Jahrzehnten laut Video ungefähr verändert?",
+                options: [
+                    { text: "Die Zahl ist stabil geblieben, aber der Lebensraum schrumpft.", correct: false },
+                    { text: "Von ca. 100.000 auf ca. 80.000 abgenommen.", correct: false },
+                    { text: "Von ca. 200.000 auf ca. 50.000 abgenommen.", correct: true },
+                    { text: "Von ca. 50.000 auf ca. 15.000 abgenommen.", correct: false }
+                ],
+                rationale: "Die dramatische Abnahme der Population auf etwa ein Viertel der ursprünglichen Zahl wird im Video als Folge der Habitatzerstörung genannt."
+            },
+            {
+                question: "Warum würde ein einfacher Boykott von Palmöl laut Dirk Steffens wahrscheinlich nicht die Lösung sein?",
+                options: [
+                    { text: "Weil Palmöl das einzige Öl ist, das im menschlichen Körper abgebaut werden kann.", correct: false },
+                    { text: "Weil die Alternativen (Raps, Soja) viel weniger Ertrag pro Hektar liefern und mehr Fläche benötigen würden.", correct: true },
+                    { text: "Weil Palmölplantagen wichtige CO2-Speicher sind, die sonst verloren gingen.", correct: false },
+                    { text: "Weil Palmöl nur in Ländern angebaut wird, die keine anderen Einkommensquellen haben.", correct: false }
+                ],
+                rationale: "Aufgrund des geringeren Ertrags von Alternativen müsste mehr Land für diese anderen Öle gerodet werden, was das Problem nur verlagern würde."
+            },
+            {
+                question: "Wie viel Öl pro Jahr und Hektar produziert eine Palmölplantage ungefähr, im Vergleich zu Raps, Soja oder Sonnenblumen?",
+                options: [
+                    { text: "Ungefähr die Hälfte.", correct: false },
+                    { text: "Etwa 20% mehr.", correct: false },
+                    { text: "Drei- bis viermal so viel.", correct: true },
+                    { text: "Genau die gleiche Menge.", correct: false }
+                ],
+                rationale: "Die Ölpalme ist extrem ertragreich, was sie sehr effizient macht und die Konkurrenz mit anderen Ölsorten schwer. Sie produziert dreieinhalb Tonnen Öl pro Hektar und Jahr, Alternativen etwa ein Drittel davon."
+            },
+            {
+                question: "Was passiert häufig mit jungen Orang-Utans, deren Mütter auf Palmölplantagen eindringen, um die jungen Sprossen zu fressen?",
+                options: [
+                    { text: "Sie werden von ihrer Mutter getrennt und verenden oft.", correct: true },
+                    { text: "Sie werden sofort in Zoos in Europa gebracht.", correct: false },
+                    { text: "Sie passen sich schnell an die Plantage als neuen Lebensraum an.", correct: false },
+                    { text: "Sie werden von den Plantagenarbeitern aufgezogen und trainiert.", correct: false }
+                ],
+                rationale: "Die Trennung von der Mutter ist die häufigste und tragischste Folge des Eindringens in Plantagen, was ohne menschliche Hilfe oft tödlich endet."
+            },
+            {
+                question: "Was schlägt Dirk Steffens als praktische Maßnahme gegen die Palmöl-Problematik vor?",
+                options: [
+                    { text: "Ausschließlich Palmöl aus nachhaltigem Anbau konsumieren und weniger Fertignahrung essen.", correct: true },
+                    { text: "Die gesamte Ölproduktion in unterirdische Plantagen verlegen.", correct: false },
+                    { text: "Der Politik verbieten, Palmöl überhaupt noch zu importieren.", correct: false },
+                    { text: "Weltweit alle Ölpalmen durch Sonnenblumen ersetzen.", correct: false }
+                ],
+                rationale: "Da ein Totalboykott nicht sinnvoll ist, ist die beste Strategie bewusstes Konsumieren von nachhaltigem Palmöl und die Reduzierung von Fertignahrungsmitteln, in denen viel davon steckt."
+            },
+            {
+                question: "In wie vielen Supermarktprodukten steckt Palmöl, laut der Aussage im Video, ungefähr?",
+                options: [
+                    { text: "Ausschließlich in Süßigkeiten und Chips.", correct: false },
+                    { text: "In jedem zehnten Produkt.", correct: false },
+                    { text: "In jedem zweiten Produkt.", correct: true },
+                    { text: "In weniger als 5% aller Produkte.", correct: false }
+                ],
+                rationale: "Palmöl ist aufgrund seiner vielfältigen industriellen Eigenschaften und des niedrigen Preises in einer extrem hohen Anzahl von Konsumgütern enthalten."
+            },
+            {
+                question: "Welche Fläche des uralten Regenwaldes ging in Indonesien laut Video allein in den vergangenen drei Jahrzehnten verloren?",
+                options: [
+                    { text: "Die Hälfte aller Flüsse und Seen.", correct: false },
+                    { text: "Ein Drittel der Fläche des uralten Regenwaldes.", correct: true },
+                    { text: "Die gesamte Fläche von Sumatra.", correct: false },
+                    { text: "Ein Zehntel der gesamten Insel Borneo.", correct: false }
+                ],
+                rationale: "Die Zerstörung des Regenwaldes ist massiv, wobei ein Drittel der Fläche in nur 30 Jahren für Plantagen gerodet wurde."
+            }
+        ];
+        
+        // 4. Aktualisierung der Titel/Beschreibung in der UI
+        document.getElementById('quiz-title-display').textContent = 'Palmöl: Die Wahrheit';
+        document.getElementById('quiz-description-display').textContent = 'Beantworte die Fragen und knacke den Highscore';
+        document.title = 'Palmöl: Die Wahrheit';
+
+
+        // === Globale Zustände & Firebase-Initialisierung ===
+        let app;
+        let auth;
+        let db;
+        let currentUser = null;
+
+        let currentQuestionIndex = 0;
+        let score = 0;
+        let timerInterval;
+        let totalSeconds = 0;
+        let quizActive = false;
+        let userHasSubmitted = false;
+        
+        const questionText = document.getElementById('question-text');
+        const optionsContainer = document.getElementById('options-container');
+        const nextButton = document.getElementById('next-button');
+        const startButton = document.getElementById('start-button');
+        const feedbackContainer = document.getElementById('feedback-container');
+        const feedbackText = document.getElementById('feedback-text');
+        const rationaleText = document.getElementById('rationale-text');
+        const timerDisplay = document.getElementById('timer-display');
+        const scoreDisplay = document.getElementById('score-display');
+        const questionCounter = document.getElementById('question-counter');
+        const statsContainer = document.getElementById('stats-container');
+        const startScreen = document.getElementById('start-screen');
+        const questionScreen = document.getElementById('question-screen');
+        const resultScreen = document.getElementById('result-screen');
+        const finalScoreDisplay = document.getElementById('final-score');
+        const finalTimeDisplay = document.getElementById('final-time');
+        const leaderboardList = document.getElementById('leaderboard-list');
+        const usernameInput = document.getElementById('username-input');
+        const submitScoreButton = document.getElementById('submit-score-button');
+        const restartButton = document.getElementById('restart-button');
+
+
+        async function initializeFirebase() {
+            try {
+                app = initializeApp(firebaseConfigOverride);
+                auth = getAuth(app);
+                db = getFirestore(app);
+                
+                // Anmelde-Logik
+                if (initialAuthToken) {
+                    await signInWithCustomToken(auth, initialAuthToken); 
+                } else {
+                    await signInAnonymously(auth);
+                }
+                
+                listenForAuth();
+                loadLeaderboard();
+            } catch (error) {
+                console.error("Firebase Initialisierungsfehler:", error);
+                document.getElementById('quiz-description-display').textContent = "Fehler: Firebase-Dienste konnten nicht initialisiert werden (Siehe Konsole).";
+                startButton.textContent = "Fehler (Siehe Konsole)";
+            }
+        }
+
+        function listenForAuth() {
+            onAuthStateChanged(auth, (user) => {
+                if (user) {
+                    currentUser = user;
+                    console.log("Firebase-Anmeldung erfolgreich:", user.uid);
+                    startButton.disabled = false;
+                    startButton.textContent = "Starte das Quiz";
+                    usernameInput.value = localStorage.getItem('quizUsername') || '';
+                } else {
+                     // Sollte durch die initiale Anmeldelogik oben abgedeckt sein
+                }
+            });
+        }
+
+        // === Timer Funktionen ===
+        function startTimer() {
+            totalSeconds = 0;
+            updateTimerDisplay();
+            timerInterval = setInterval(() => {
+                totalSeconds++;
+                updateTimerDisplay();
+            }, 1000);
+        }
+
+        function stopTimer() {
+            clearInterval(timerInterval);
+        }
+
+        function updateTimerDisplay() {
+            const minutes = String(Math.floor(totalSeconds / 60)).padStart(2, '0');
+            const seconds = String(totalSeconds % 60).padStart(2, '0');
+            timerDisplay.textContent = `${minutes}:${seconds}`;
+        }
+
+        // === Quiz Logik ===
+        function startQuiz() {
+            currentQuestionIndex = 0;
+            score = 0;
+            totalSeconds = 0;
+            quizActive = true;
+            userHasSubmitted = false;
+
+            startScreen.classList.add('hidden');
+            resultScreen.classList.add('hidden');
+            questionScreen.classList.remove('hidden');
+            statsContainer.classList.remove('hidden');
+            submitScoreButton.disabled = false;
+            submitScoreButton.textContent = "Score speichern";
+            
+            scoreDisplay.textContent = score;
+            questionCounter.textContent = `${currentQuestionIndex}/${quizData.length}`;
+            
+            startTimer();
+            showQuestion();
+        }
+
+        function showQuestion() {
+            if (currentQuestionIndex >= quizData.length) {
+                endQuiz();
+                return;
+            }
+
+            const currentQuestion = quizData[currentQuestionIndex];
+            questionText.textContent = currentQuestion.question;
+            optionsContainer.innerHTML = '';
+            nextButton.classList.add('hidden');
+            feedbackContainer.classList.add('hidden');
+            questionCounter.textContent = `${currentQuestionIndex + 1}/${quizData.length}`;
+
+            currentQuestion.options.forEach((option, index) => {
+                const button = document.createElement('button');
+                button.textContent = option.text;
+                button.classList.add('btn-option', 'w-full', 'p-3', 'text-left', 'border', 'border-gray-300', 'rounded-lg', 'text-gray-700', 'bg-white', 'hover:bg-indigo-50', 'transition', 'duration-200');
+                button.dataset.index = index;
+                button.onclick = () => selectAnswer(button, option.correct, currentQuestion.rationale);
+                optionsContainer.appendChild(button);
+            });
+        }
+
+        function selectAnswer(selectedButton, isCorrect, rationale) {
+            if (!quizActive) return;
+
+            // Deaktiviere alle Buttons
+            Array.from(optionsContainer.children).forEach(button => {
+                button.disabled = true;
+                if (button.dataset.index !== selectedButton.dataset.index) {
+                    button.classList.remove('hover:bg-indigo-50');
+                }
+            });
+
+            // Feedback anzeigen
+            feedbackContainer.classList.remove('hidden');
+            rationaleText.textContent = rationale ? `Begründung: ${rationale}` : '';
+
+            if (isCorrect) {
+                score++;
+                scoreDisplay.textContent = score;
+                selectedButton.classList.add('correct');
+                feedbackText.textContent = "Richtig! Gut gemacht.";
+            } else {
+                selectedButton.classList.add('incorrect');
+                feedbackText.textContent = "Falsch. Die richtige Antwort ist markiert.";
+                // Markiere die korrekte Antwort
+                Array.from(optionsContainer.children).forEach(button => {
+                    if (quizData[currentQuestionIndex].options[button.dataset.index].correct) {
+                        button.classList.add('correct');
+                    }
+                });
+            }
+
+            // Nächste-Frage-Button anzeigen
+            nextButton.disabled = false;
+            nextButton.classList.remove('hidden');
+        }
+
+        function nextQuestion() {
+            currentQuestionIndex++;
+            nextButton.classList.add('hidden');
+            if (currentQuestionIndex < quizData.length) {
+                showQuestion();
+            } else {
+                endQuiz();
+            }
+        }
+
+        function endQuiz() {
+            stopTimer();
+            quizActive = false;
+            
+            questionScreen.classList.add('hidden');
+            statsContainer.classList.add('hidden');
+            resultScreen.classList.remove('hidden');
+
+            const timeString = timerDisplay.textContent;
+            
+            finalScoreDisplay.textContent = score;
+            finalTimeDisplay.textContent = timeString;
+            document.getElementById('final-time').dataset.seconds = totalSeconds;
+
+            // Standardname setzen, falls vorhanden
+            const storedUsername = localStorage.getItem('quizUsername');
+            if (storedUsername) {
+                usernameInput.value = storedUsername;
+            }
+        }
+
+        // === Bestenliste Logik ===
+        function getLeaderboardPath() {
+            return `artifacts/${appIdOverride}/public/data/leaderboard-scores`;
+        }
+
+        function loadLeaderboard() {
+            if (!db) return;
+
+            const leaderboardRef = collection(db, getLeaderboardPath());
+            // Die Abfrage sortiert nur nach Score absteigend, um Index-Fehler zu vermeiden.
+            const q = query(leaderboardRef, orderBy("score", "desc"), limit(10));
+
+            onSnapshot(q, (snapshot) => {
+                // Konvertiere die Snapshot-Daten in ein Array, um eine JavaScript-basierte Sortierung zu ermöglichen
+                let scores = [];
+                snapshot.forEach((doc) => {
+                    scores.push(doc.data());
+                });
+
+                // Manuelle Sortierung in JavaScript für die Top 10:
+                // 1. Score absteigend (höherer Score zuerst)
+                // 2. Zeit aufsteigend (schnellere Zeit zuerst bei gleichem Score)
+                scores.sort((a, b) => {
+                    if (b.score !== a.score) {
+                        return b.score - a.score; 
+                    }
+                    return a.time - b.time; 
+                });
+
+                // Da die Firestore-Abfrage bereits nach Score begrenzt, nehmen wir die sortierten Ergebnisse.
+                const topScores = scores;
+                
+                leaderboardList.innerHTML = '';
+                if (topScores.length === 0) {
+                    leaderboardList.innerHTML = '<li class="text-gray-500 italic">Noch keine Highscores. Sei der Erste!</li>';
+                    return;
+                }
+                
+                topScores.forEach((data, index) => {
+                    const timeSecs = data.time || 0;
+                    const minutes = String(Math.floor(timeSecs / 60)).padStart(2, '0');
+                    const seconds = String(timeSecs % 60).padStart(2, '0');
+                    const timeFormatted = `${minutes}:${seconds}`;
+
+                    const li = document.createElement('li');
+                    li.classList.add('flex', 'justify-between', 'items-center', 'p-2', 'rounded');
+                    
+                    let rankClass = 'text-gray-700 font-medium';
+                    if (index === 0) rankClass = 'text-amber-500 font-bold text-lg';
+                    else if (index === 1) rankClass = 'text-slate-500 font-bold';
+                    else if (index === 2) rankClass = 'text-yellow-600 font-bold';
+
+                    li.innerHTML = `
+                        <span class="${rankClass}">${index + 1}. ${data.username || 'Anonym'}</span>
+                        <span class="${rankClass}">
+                            ${data.score} Pkt. <span class="text-sm text-gray-500 ml-2">${timeFormatted}</span>
+                        </span>
+                    `;
+                    leaderboardList.appendChild(li);
+                });
+            }, (error) => {
+                console.error("Fehler beim Laden der Bestenliste:", error);
+                leaderboardList.innerHTML = '<li class="text-red-500">Fehler beim Laden.</li>';
+            });
+        }
+
+        async function submitScore() {
+            if (userHasSubmitted) return;
+            if (!currentUser || !db) {
+                 console.error("Benutzer oder DB nicht bereit.");
+                 submitScoreButton.textContent = "Fehler (Neu laden)";
+                 return;
+            }
+
+            const username = usernameInput.value.trim();
+            if (username.length < 2 || username.length > 20) {
+                 console.error("Ungültiger Benutzername.");
+                 const originalPlaceholder = usernameInput.placeholder;
+                 usernameInput.placeholder = "2-20 Zeichen benötigt!";
+                 usernameInput.focus();
+                 setTimeout(() => { usernameInput.placeholder = originalPlaceholder; }, 3000);
+                 return;
+            }
+
+            localStorage.setItem('quizUsername', username);
+
+            submitScoreButton.disabled = true;
+            submitScoreButton.textContent = "Speichere...";
+
+            const scoreData = {
+                username: username,
+                score: score,
+                time: totalSeconds, // Speichert die Zeit in Sekunden
+                timestamp: serverTimestamp(),
+                userId: currentUser.uid 
+            };
+            
+            try {
+                // Erstellt ein neues Dokument in der öffentlichen Sammlung
+                const newScoreRef = doc(collection(db, getLeaderboardPath())); 
+                await setDoc(newScoreRef, scoreData);
+
+                userHasSubmitted = true;
+                submitScoreButton.textContent = "Gespeichert!";
+
+            } catch (error) {
+                console.error("Fehler beim Speichern des Scores:", error);
+                submitScoreButton.disabled = false;
+                submitScoreButton.textContent = "Speichern fehlgeschlagen";
+            }
+        }
+
+        // === Event-Listener ===
+        startButton.addEventListener('click', startQuiz);
+        nextButton.addEventListener('click', nextQuestion);
+        submitScoreButton.addEventListener('click', submitScore);
+        restartButton.addEventListener('click', () => {
+            resultScreen.classList.add('hidden');
+            startScreen.classList.remove('hidden');
+            // Timer und Score zurücksetzen (wird in startQuiz gemacht, aber zur Sicherheit)
+            clearInterval(timerInterval);
+        });
+
+
+        // === INITIALISIERUNG ===
+        if (quizData.length === 0) {
+            questionText.textContent = "Fehler: Es sind keine Fragen geladen. Bitte überprüfen Sie das Quiz-Daten-Array.";
+            startButton.disabled = true;
+        }
+
+        document.addEventListener('DOMContentLoaded', initializeFirebase);
+        
+    </script>
+</body>
+</html>
