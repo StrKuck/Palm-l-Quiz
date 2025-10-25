@@ -6,6 +6,12 @@
     <title>Palmöl: Die Wahrheit</title>
     <script src="https://cdn.tailwindcss.com"></script>
     <style>
+        /* Behebt die Kompatibilitäts-Warnung */
+        html {
+            -webkit-text-size-adjust: 100%; /* Für ältere Browser */
+            text-size-adjust: 100%;         /* Moderner Standard */
+        }
+    
         /* Zusätzliches benutzerdefiniertes Styling */
         body {
             background-color: #f7fafc;
@@ -83,7 +89,7 @@
             <p id="question-text" class="text-2xl font-semibold mb-6 text-gray-800">Fragentext</p>
 
             <div id="options-container" class="space-y-4 mb-6">
-                </div>
+            </div>
 
             <div id="feedback-container" class="hidden p-4 rounded-lg mt-4" role="alert">
                 <p id="feedback-text" class="font-bold mb-2 text-lg"></p>
@@ -113,23 +119,22 @@
             <div class="mt-8">
                 <h3 class="text-xl font-semibold mb-4 text-gray-800">Top 10 Bestenliste</h3>
                 <ul id="leaderboard-list" class="space-y-2 text-left p-4 border rounded-lg">
-                    </ul>
+                </ul>
             </div>
         </div>
 
     </div>
 
-<!-- WICHTIG: Die Kompatibilitäts-CDNs wurden entfernt, da sie eval() verwenden und durch CSP blockiert werden.
-     Die Logik wurde in ein "type='module'"-Skript umgewandelt. -->
-
 <script type="module">
     // Importiert die notwendigen Firebase-Modulfunktionen
     import { initializeApp } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-app.js";
     import { getAuth, signInAnonymously, signInWithCustomToken, onAuthStateChanged } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-auth.js";
-    import { getFirestore, collection, query, orderBy, onSnapshot, addDoc, FieldValue } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js";
+    
+    // === KORREKTUR: "serverTimestamp" und "FieldValue" hier direkt importieren ===
+    import { getFirestore, collection, query, orderBy, onSnapshot, addDoc, FieldValue, serverTimestamp } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js";
 
-    // Holen Sie sich die serverTimestamp-Funktion, die FieldValue exportiert.
-    const serverTimestamp = () => new FieldValue('serverTimestamp');
+    // === KORREKTUR: Veraltete Hilfsfunktion entfernt ===
+    // const serverTimestamp = () => new FieldValue('serverTimestamp'); // <-- Diese Zeile wurde entfernt.
 
     // === QUIZ DYNAMISCHE DATEN (KEINE ÄNDERUNG) ===
     const appId = 'palmoel_quiz_1';
@@ -578,7 +583,7 @@
             username: username,
             score: score,
             time: totalSeconds, // Speichert die Zeit in Sekunden
-            timestamp: serverTimestamp(),
+            timestamp: serverTimestamp(), // Verwendet die direkt importierte Funktion
             userId: currentUser.uid 
         };
         
