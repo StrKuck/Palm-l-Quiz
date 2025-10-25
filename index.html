@@ -2,8 +2,9 @@
 <html lang="de">
 <head>
     <meta charset="UTF-8">
+    <!-- KORRIGIERT: Das viewport-Meta-Tag muss im Head-Bereich stehen -->
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Quiz: Palmöl</title>
+    <title>Palmöl: Die Wahrheit</title>
     <script src="https://cdn.tailwindcss.com"></script>
     <style>
         /* Zusätzliches benutzerdefiniertes Styling */
@@ -119,7 +120,7 @@
 
     </div>
 
-
+<!-- Firebase Kompatibilitäts-CDNs (beheben den eval()-Fehler) -->
 <script src="https://www.gstatic.com/firebasejs/11.6.1/firebase-app-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/11.6.1/firebase-auth-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore-compat.js"></script>
@@ -128,6 +129,7 @@
     // === QUIZ DYNAMISCHE DATEN (BLEIBEN GLEICH) ===
     const appId = 'palmoel_quiz_1';
     
+    // ACHTUNG: Die API-Schlüssel sind hier aus Testgründen enthalten, werden aber von Canvas überschrieben.
     const firebaseConfig = {
         apiKey: "AIzaSyDY9Va_wf2Kj4LREi2jd9_g9H4bts1tygc",
         authDomain: "quizgenerator-ff451.firebaseapp.com",
@@ -279,7 +281,8 @@
     const resultScreen = document.getElementById('result-screen');
     const finalScoreDisplay = document.getElementById('final-score');
     const finalTimeDisplay = document.getElementById('final-time');
-    const leaderboardList = document.getElementById('leaderboard-list');
+    // leaderboardList Element wird im HTML mehrfach verwendet (Start- und Result-Screen), 
+    // muss aber nicht separat hier definiert werden, da es lokal im Code geholt wird.
     const usernameInput = document.getElementById('username-input');
     const submitScoreButton = document.getElementById('submit-score-button');
     const restartButton = document.getElementById('restart-button');
@@ -463,19 +466,42 @@
 
         const leaderboardRef = db.collection(getLeaderboardPath());
         
-        // Abfrage: Sortiert nach Score (absteigend) und Zeit (aufsteigend)
-        const q = leaderboardRef.orderBy("score", "desc").orderBy("time", "asc").limit(10);
+        // FIX: Die doppelte Sortierung (score, time) in Firestore erfordert einen Index,
+        // den wir hier nicht erstellen können. Wir sortieren jetzt nur primär nach Score
+        // in Firestore und holen 20 Einträge, um die sekundäre Sortierung (nach Zeit)
+        // und Limitierung auf 10 in JavaScript durchzuführen.
+        
+        const q = leaderboardRef.orderBy("score", "desc").limit(20);
 
+        // onSnapshot wird verwendet, um in Echtzeit auf Änderungen zu reagieren
         q.onSnapshot((snapshot) => {
             let scores = [];
             snapshot.forEach((doc) => {
                 scores.push(doc.data());
             });
 
-            const topScores = scores;
-            leaderboardList.innerHTML = '';
+            // Lokale Sortierung:
+            // Primär nach Score (absteigend) und Sekundär nach Zeit (aufsteigend)
+            scores.sort((a, b) => {
+                // Hauptkriterium: Score (absteigend)
+                if (a.score !== b.score) {
+                    return b.score - a.score;
+                }
+                // Sekundärkriterium: Zeit (aufsteigend)
+                return a.time - b.time;
+            });
+            
+            // Lokale Limitierung auf Top 10
+            const topScores = scores.slice(0, 10);
+
+            const leaderboardListElement = startScreen.querySelector('#leaderboard-list') || resultScreen.querySelector('#leaderboard-list');
+            
+            if (!leaderboardListElement) return;
+
+            leaderboardListElement.innerHTML = '';
+
             if (topScores.length === 0) {
-                leaderboardList.innerHTML = '<li class="text-gray-500 italic">Noch keine Highscores. Sei der Erste!</li>';
+                leaderboardListElement.innerHTML = '<li class="text-gray-500 italic">Noch keine Highscores. Sei der Erste!</li>';
                 return;
             }
             
@@ -499,11 +525,14 @@
                         ${data.score} Pkt. <span class="text-sm text-gray-500 ml-2">${timeFormatted}</span>
                     </span>
                 `;
-                leaderboardList.appendChild(li);
+                leaderboardListElement.appendChild(li);
             });
         }, (error) => {
             console.error("Fehler beim Laden der Bestenliste:", error);
-            leaderboardList.innerHTML = '<li class="text-red-500">Fehler beim Laden der Bestenliste.</li>';
+            const leaderboardListElement = startScreen.querySelector('#leaderboard-list') || resultScreen.querySelector('#leaderboard-list');
+            if (leaderboardListElement) {
+                 leaderboardListElement.innerHTML = '<li class="text-red-500">Fehler beim Laden der Bestenliste.</li>';
+            }
         });
     }
 
@@ -559,6 +588,7 @@
     restartButton.addEventListener('click', () => {
         resultScreen.classList.add('hidden');
         startScreen.classList.remove('hidden');
+        // Laden der Bestenliste wird über onSnapshot automatisch ausgelöst
         clearInterval(timerInterval);
     });
 
@@ -569,6 +599,7 @@
         startButton.disabled = true;
     }
 
+    // Stellt sicher, dass Firebase erst nach dem Laden des gesamten DOM initialisiert wird.
     document.addEventListener('DOMContentLoaded', initializeFirebase);
     
 </script>
