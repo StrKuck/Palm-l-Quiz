@@ -119,13 +119,19 @@
 
     </div>
 
-<!-- Firebase Kompatibilitäts-CDNs (beheben den eval()-Fehler) -->
-<script src="https://www.gstatic.com/firebasejs/11.6.1/firebase-app-compat.js"></script>
-<script src="https://www.gstatic.com/firebasejs/11.6.1/firebase-auth-compat.js"></script>
-<script src="https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore-compat.js"></script>
+<!-- WICHTIG: Die Kompatibilitäts-CDNs wurden entfernt, da sie eval() verwenden und durch CSP blockiert werden.
+     Die Logik wurde in ein "type='module'"-Skript umgewandelt. -->
 
-<script>
-    // === QUIZ DYNAMISCHE DATEN ===
+<script type="module">
+    // Importiert die notwendigen Firebase-Modulfunktionen
+    import { initializeApp } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-app.js";
+    import { getAuth, signInAnonymously, signInWithCustomToken, onAuthStateChanged } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-auth.js";
+    import { getFirestore, collection, query, orderBy, onSnapshot, addDoc, FieldValue } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js";
+
+    // Holen Sie sich die serverTimestamp-Funktion, die FieldValue exportiert.
+    const serverTimestamp = () => new FieldValue('serverTimestamp');
+
+    // === QUIZ DYNAMISCHE DATEN (KEINE ÄNDERUNG) ===
     const appId = 'palmoel_quiz_1';
     
     // Konfiguration für den Fall, dass die App lokal ausgeführt wird (außerhalb des Canvas-Tools).
@@ -279,6 +285,7 @@
     let quizActive = false;
     let userHasSubmitted = false;
     
+    // Elemente
     const questionText = document.getElementById('question-text');
     const optionsContainer = document.getElementById('options-container');
     const nextButton = document.getElementById('next-button');
@@ -302,20 +309,19 @@
 
     async function initializeFirebase() {
         try {
-            // FIX: Verwenden der vorbereiteten Konfiguration
             // Initialisiert die App mit der korrekten Konfiguration
-            app = firebase.initializeApp(firebaseConfigToUse);
-            // Nutzt die globalen compatibility-Objekte
-            auth = app.auth();
-            db = app.firestore();
+            app = initializeApp(firebaseConfigToUse);
+            // Holt die Auth- und Firestore-Instanzen
+            auth = getAuth(app);
+            db = getFirestore(app);
             
             // Anmelde-Logik
             if (initialAuthToken) {
                 // Bei Canvas-Ausführung wird dieser Pfad verwendet
-                await auth.signInWithCustomToken(initialAuthToken); 
+                await signInWithCustomToken(auth, initialAuthToken); 
             } else {
                 // Bei lokaler Ausführung wird dieser Pfad verwendet (anonyme Anmeldung)
-                await auth.signInAnonymously();
+                await signInAnonymously(auth);
             }
             
             listenForAuth();
@@ -328,7 +334,7 @@
     }
 
     function listenForAuth() {
-        auth.onAuthStateChanged((user) => {
+        onAuthStateChanged(auth, (user) => {
             if (user) {
                 currentUser = user;
                 console.log("Firebase-Anmeldung erfolgreich:", user.uid);
@@ -479,14 +485,11 @@
     function loadLeaderboard() {
         if (!db) return;
 
-        const leaderboardRef = db.collection(getLeaderboardPath());
+        // Erstellt eine Abfrage, die nur nach Score absteigend sortiert (um Index-Probleme zu vermeiden)
+        const q = query(collection(db, getLeaderboardPath()), orderBy("score", "desc"));
         
-        // FIX: Sortiert primär nach Score in Firestore, um das Indexproblem zu umgehen.
-        // Die sekundäre Sortierung nach Zeit und das Limit werden in JavaScript durchgeführt.
-        const q = leaderboardRef.orderBy("score", "desc").limit(20);
-
         // onSnapshot wird verwendet, um in Echtzeit auf Änderungen zu reagieren
-        q.onSnapshot((snapshot) => {
+        onSnapshot(q, (snapshot) => {
             let scores = [];
             snapshot.forEach((doc) => {
                 scores.push(doc.data());
@@ -575,13 +578,13 @@
             username: username,
             score: score,
             time: totalSeconds, // Speichert die Zeit in Sekunden
-            timestamp: firebase.firestore.FieldValue.serverTimestamp(),
+            timestamp: serverTimestamp(),
             userId: currentUser.uid 
         };
         
         try {
             // Fügt ein neues Dokument in der öffentlichen Sammlung hinzu
-            await db.collection(getLeaderboardPath()).add(scoreData);
+            await addDoc(collection(db, getLeaderboardPath()), scoreData);
 
             userHasSubmitted = true;
             submitScoreButton.textContent = "Gespeichert!";
