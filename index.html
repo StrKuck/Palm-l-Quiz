@@ -2,7 +2,6 @@
 <html lang="de">
 <head>
     <meta charset="UTF-8">
-    <!-- KORRIGIERT: Das viewport-Meta-Tag muss im Head-Bereich stehen -->
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Palmöl: Die Wahrheit</title>
     <script src="https://cdn.tailwindcss.com"></script>
@@ -126,11 +125,11 @@
 <script src="https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore-compat.js"></script>
 
 <script>
-    // === QUIZ DYNAMISCHE DATEN (BLEIBEN GLEICH) ===
+    // === QUIZ DYNAMISCHE DATEN ===
     const appId = 'palmoel_quiz_1';
     
-    // ACHTUNG: Die API-Schlüssel sind hier aus Testgründen enthalten, werden aber von Canvas überschrieben.
-    const firebaseConfig = {
+    // Konfiguration für den Fall, dass die App lokal ausgeführt wird (außerhalb des Canvas-Tools).
+    const DEFAULT_FIREBASE_CONFIG = {
         apiKey: "AIzaSyDY9Va_wf2Kj4LREi2jd9_g9H4bts1tygc",
         authDomain: "quizgenerator-ff451.firebaseapp.com",
         projectId: "quizgenerator-ff451",
@@ -139,9 +138,24 @@
         appId: "1:396720876641:web:700fa550a6129ad06f4e20"
     };
 
-    const firebaseConfigOverride = typeof __firebase_config !== 'undefined' ? JSON.parse(__firebase_config) : firebaseConfig;
-    const appIdOverride = typeof __app_id !== 'undefined' ? __app_id : appId;
-    const initialAuthToken = typeof __initial_auth_token !== 'undefined' ? __initial_auth_token : null;
+    // Wählt die Konfiguration: Canvas-Tool-Konfig > Lokale Standardkonfig
+    let firebaseConfigToUse = DEFAULT_FIREBASE_CONFIG;
+    let initialAuthToken = null;
+    let appIdOverride = appId;
+
+    if (typeof __firebase_config !== 'undefined') {
+        try {
+            firebaseConfigToUse = JSON.parse(__firebase_config);
+        } catch (e) {
+            console.error("Fehler beim Parsen von __firebase_config:", e);
+        }
+    }
+    if (typeof __app_id !== 'undefined') {
+        appIdOverride = __app_id;
+    }
+    if (typeof __initial_auth_token !== 'undefined') {
+        initialAuthToken = __initial_auth_token;
+    }
     
     // Das eigentliche Quiz-Daten-Array
     const quizData = [
@@ -281,8 +295,6 @@
     const resultScreen = document.getElementById('result-screen');
     const finalScoreDisplay = document.getElementById('final-score');
     const finalTimeDisplay = document.getElementById('final-time');
-    // leaderboardList Element wird im HTML mehrfach verwendet (Start- und Result-Screen), 
-    // muss aber nicht separat hier definiert werden, da es lokal im Code geholt wird.
     const usernameInput = document.getElementById('username-input');
     const submitScoreButton = document.getElementById('submit-score-button');
     const restartButton = document.getElementById('restart-button');
@@ -290,16 +302,19 @@
 
     async function initializeFirebase() {
         try {
-            // Initialisiert die App mit den globalen firebase-Objekten
-            app = firebase.initializeApp(firebaseConfigOverride);
+            // FIX: Verwenden der vorbereiteten Konfiguration
+            // Initialisiert die App mit der korrekten Konfiguration
+            app = firebase.initializeApp(firebaseConfigToUse);
             // Nutzt die globalen compatibility-Objekte
             auth = app.auth();
             db = app.firestore();
             
             // Anmelde-Logik
             if (initialAuthToken) {
+                // Bei Canvas-Ausführung wird dieser Pfad verwendet
                 await auth.signInWithCustomToken(initialAuthToken); 
             } else {
+                // Bei lokaler Ausführung wird dieser Pfad verwendet (anonyme Anmeldung)
                 await auth.signInAnonymously();
             }
             
@@ -466,11 +481,8 @@
 
         const leaderboardRef = db.collection(getLeaderboardPath());
         
-        // FIX: Die doppelte Sortierung (score, time) in Firestore erfordert einen Index,
-        // den wir hier nicht erstellen können. Wir sortieren jetzt nur primär nach Score
-        // in Firestore und holen 20 Einträge, um die sekundäre Sortierung (nach Zeit)
-        // und Limitierung auf 10 in JavaScript durchzuführen.
-        
+        // FIX: Sortiert primär nach Score in Firestore, um das Indexproblem zu umgehen.
+        // Die sekundäre Sortierung nach Zeit und das Limit werden in JavaScript durchgeführt.
         const q = leaderboardRef.orderBy("score", "desc").limit(20);
 
         // onSnapshot wird verwendet, um in Echtzeit auf Änderungen zu reagieren
